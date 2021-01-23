@@ -1,5 +1,24 @@
 from requests_html import HTMLSession
 
+
+class Htmlstack:
+    def __init__(self, linklist):
+        self.stack = linklist
+        self.index = 0
+
+    def peek(self, delta=0):
+        try:
+            return self.stack[self.index + delta]
+        except:
+            return None
+
+    def pop(self):
+        item = self.peek()
+        if item:
+            self.index += 1
+        return item
+
+
 with HTMLSession() as session:
     # Use parent page to get the links by Champ, tier, link
     with session.get(
@@ -10,6 +29,7 @@ with HTMLSession() as session:
 
         dlist = []
         linklist = []
+        # Fetch first element for loop
         tier = ranks[0].text
         for rank in ranks[1:]:
             link = rank.find("a", first=True)
@@ -20,13 +40,18 @@ with HTMLSession() as session:
                 tier = rank.text
             else:
                 linklist.append(link.attrs["href"])
+    print(len(dlist))
+    x = 0
+    for dl in dlist:
+        x += len(dl["links"])
+    print(x)
 
-    d = 1  ######<<<<<<<<<<<<<<<<<<<<<<<######
+    d = 6  ####<<<<<<<<<<<<<<<<<<<<<<<<<####
     for tier_linkDict in dlist[d : d + 1]:
         tier = tier_linkDict["tier"]
         links = tier_linkDict["links"]
-        u = 0  ######<<<<<<<<<<<<<<<<<<#######
-        for url in links[u:]:
+        u = 25  ####<<<<<<<<<<<<<<<<<<<<<####
+        for url in links[u : u + 1]:
             errorList = []
             with session.get(url) as r:
                 sel = ".entry-content > *"
@@ -78,7 +103,9 @@ with HTMLSession() as session:
                     while any(
                         ele in htmlChildList[0].text for ele in areaList
                     ) or htmlChildList[0].find("img, p"):
+
                         area = htmlChildList.pop(0).text
+                        # Assume i
                         if not area:
                             area = "All"
                         while htmlChildList[0].find("img, p"):
@@ -95,14 +122,15 @@ with HTMLSession() as session:
                             )
 
                     print(
-                        f'{d}->{u}\t{len(mlist)}: {mlist[0]["area"], mlist[0]["offence"][:16]})'
+                        f'{d:3}->{u:2}, {len(mlist)}: {mlist[0]["area"], mlist[0]["offence"]}'
                     )
                 if errorList:
                     print(errorList[0])
                 print()
                 # End of: if "Mastery Guide"
+            u += 1
             # End of: with session.get(url) as r
-        u += 1
         # End of: links
     d += 1
     # End of: for tier_linkDict in dlist
+print("Done")
