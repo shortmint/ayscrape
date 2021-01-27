@@ -1,66 +1,21 @@
-from getlinks import getlinks
 from requests_html import HTMLSession
 
+from classes import *
+from functions import *
+from getlinks import getlinks
 
-class Htmlstack:
-    def __init__(self, linklist):
-        self.stack = linklist
-        self.index = 0
-        self.eol = False
+# Use parent page to get the links by Champ, tier, link
+dlist = getlinks()
 
-    def peek(self, delta=0):
-        try:
-            return self.stack[self.index + delta]
-        except:
-            self.eol = True
-            pass
-
-    def pop(self, delta=0):
-        item = self.peek(delta)
-        if item:
-            self.index += 1
-        return item
-
-
-def star2num(str):
-    return (
-        str.replace("★★★★★", "5")
-        .replace("★★★★✰", "4")
-        .replace("★★★✰✰", "3")
-        .replace("★★✰✰✰", "2")
-        .replace("★✰✰✰✰", "1")
-        .replace("✰✰✰✰✰", "0")
-        .replace("★", "")
-        .replace("✰", "")
-    )
-
-
-def equip_priority(e, removefirst=0):
-    es = e.split("\n")[removefirst:]
-    if len(es) > 3:
-        del es[1:4]
-    return "\n".join(es)
-
-
-def search(childlist, str):
-    while childlist.peek():
-        if str in childlist.peek().text:
-            return True
-        else:
-            childlist.pop()
-    return False
-
-
+# open session
 with HTMLSession() as session:
 
-    # Use parent page to get the links by Champ, tier, link
-    dlist = getlinks()
     # Tempory logging (initial) >>>--------------------
     x = 0
     for dl in dlist:
         x += len(dl["links"])
     print(len(dlist), " Tier/Rarity", x, "Champions")
-    d = 0  # select tier start section <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    d = 1  # select tier start section <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     # <<< ---------------------------------------------
     # Store champion data in champlist of dictionaries
     champlist = []
@@ -70,25 +25,26 @@ with HTMLSession() as session:
         links = tier_linkDict["links"]
         # Tempory logging
         u = 0  # select champion start section  <<<<<<<<<<<<<<<<<<<<<
-        for url in links[u : u + 6]:  ############### Tempory champion range
+        for url in links[u : u + 1]:  ############### Tempory champion range
             # Initialise champion's dictionary
             champdict = {}
             # Get response
             with session.get(url) as r:
                 # Get header data
-                #  Name, Decription
+                #  Split string to list using '|' as seperater
                 header = r.html.find("#content header", first=True).text.split("|")
+                # Name is first in the list
                 champdict["Name"] = header[0].strip()
 
                 # Tempory logging >>>
-                print(champdict["Name"])
-                print(d)
-                print(u)
+                # print(champdict["Name"])
+                # print(d)
+                # print(u)
                 # <<<
-
+                # Short description is 2nd eg.'SO-RSS' Faction-Rarity/Role/Affinity
                 champdict["Desc"] = header[1].strip()
                 # Get tier from first character of key 'tier' from current dictionary
-                champdict["Tier"] = tier_linkDict["tier"][0]
+                champdict["Tier"] = tier_linkDict["tier"]
                 # Get first child list of elements
                 htmlChildList = Htmlstack(r.html.find(".entry-content > *"))
                 # First seection is quite stable but skip collection if AttriuteError occurs
@@ -98,9 +54,11 @@ with HTMLSession() as session:
                         htmlChildList.pop().find("img", first=True).attrs["src"]
                     )
                     paras = Htmlstack(htmlChildList.pop().find("td p"))
+                    # keys from table
                     champdict["obtain"] = paras.pop().text
-                    champdict["overview"] = paras.pop().text
-                    champdict["totalstats"] = paras.pop().text
+                    # overview and totalstats add keys to dictionary
+                    overview(champdict, paras.pop().text)
+                    totalstats(champdict, paras.pop().text)
                     champdict["grinding"] = star2num(paras.pop().text)
                     champdict["dungeons"] = star2num(paras.pop().text)
                     champdict["potion"] = star2num(paras.pop().text)
@@ -200,7 +158,11 @@ with HTMLSession() as session:
                         else:
                             break
                 # Tempory logging (finale) >>>----------
-                print(champdict)
+
+                for key, val in champdict.items():
+                    print(f"{key}:\n{val}\n")
+
+                # print(champdict)
                 print()
             u += 1
         d += 1
