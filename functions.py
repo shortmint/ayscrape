@@ -1,3 +1,6 @@
+import logging as log
+
+
 def star2num(str):
     return (
         str.replace("★★★★★", "5")
@@ -19,19 +22,24 @@ def equip_priority(e, removefirst=0):
 
 
 def search(childlist, str):
-    while childlist.peek():
-        if str in childlist.peek().text:
-            return True
-        else:
-            childlist.pop()
-    return False
+    try:
+        while childlist.peek():
+            if str in childlist.peek().text:
+                return True
+            else:
+                childlist.pop()
+        return False
+    except IndexError:
+        return False
 
 
 def create_dictitems_from_list(dict, keylist, valuestr):
     vl = valuestr.split("\n")
+    if len(keylist) != len(vl):
+        log.warning(f"({__name__})- keylist not same size as valuestr")
     for k, s in zip(keylist, vl):
         dict[k] = s.split(":")[-1].strip()
-        return
+    return
 
 
 def overview(dict, valuestr):
