@@ -1,43 +1,66 @@
-from get_champ import get_champ
-from requests_html import HTMLSession
-
-from classes import *
-from functions import *
-from getlinks import getlinks
-
 import logging as log
 
-log.basicConfig(level=log.INFO)
+from requests_html import HTMLSession
 
-# log.basicConfig(
-#     level=log.DEBUG, filename="root.log", format="%(asctime)%:%(levelname)%:%(message)%"
-# )
+from get_champ import get_champ
+from getlinks import getlinks
 
-# Use parent page to get the links by Champ, tier, link
-dlist = getlinks()
+log.basicConfig(level=log.INFO, format="%(levelname)s:%(module)s:%(message)s)")
+
+# level=log.DEBUG, filename="root.log", format="%(asctime)%:%(levelname)%:%(message)%"
+
+# Use parent page to get the link by (tier, link) tuples
+tierLinkList = getlinks()
 
 # open session
 with HTMLSession() as session:
 
-    d = 2  # select tier start section <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    d = 421  # select tier start section <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    maxtuple = (0, 0, 0)
+    mintuple = (0, 0, 10000)
+    max_columns = 0
+
     # Store champion data in champlist of dictionaries
     champlist = []
-    # Loop through dictionary list of links
-    for tier_linkDict in dlist[d : d + 1]:  ### Tempory tier range
+    # Loop through dictionary list of link
+    for tier_link in tierLinkList[d : d + 30]:  ### Temporary tier range
+        with session.get(tier_link["url"]) as r:
+            c = get_champ(r, tier_link)
 
-        links = tier_linkDict["links"]
-        # Tempory logging
-        u = 0  # select champion start section  <<<<<<<<<<<<<<<<<<<<<
-        for url in links[-4:]:  ############### Tempory champion range
-            # Get response
-            with session.get(url) as r:
-                champlist.append(get_champ(r, tier_linkDict))
-            u += 1
-            c = champlist[-1]
-            log.info(f'Name: {c.get("Name", "Not Found")}')
+        index = len(champlist)
+        champlist.append(c)
+        if len(c) > maxtuple[2]:
+            maxtuple = index, d, len(c)
+        if len(c) < mintuple[2]:
+            mintuple = index, d, len(c)
+
+        log.info(f"{c.get('Name', 'Not Found')} ({d}) Done")
         d += 1
 
-        # log.debug("tomes", c.get("tomes", "Not Found"))
-        # log.debug("SPD", c.get("SPD", "Not Found"))
-        # log.debug("area-1", c.get("area-1", "Not Found"))
-        # log.debug(len(c), ": ", d, "/", u)
+    log.info(
+        "First most keys: %s (%s) = %s",
+        champlist[maxtuple[0]]["Name"],
+        maxtuple[1],
+        maxtuple[2],
+    )
+
+    log.info(
+        "First least keys: %s (%s) = %s",
+        champlist[mintuple[0]]["Name"],
+        mintuple[1],
+        mintuple[2],
+    )
+
+    f = open("key1.txt", mode="w")
+    print(champlist[maxtuple[0]]["Name"], file=f)
+    # for key in sorted(champlist[maxtuple[0]].keys()):
+    for key in champlist[maxtuple[0]].keys():
+        print(key, file=f)
+    f.close()
+
+    f = open("key2.txt", mode="w")
+    print(champlist[mintuple[0]]["Name"], file=f)
+    # for key in sorted(champlist[mintuple[0]].keys()):
+    for key in champlist[mintuple[0]].keys():
+        print(key, file=f)
+    f.close()

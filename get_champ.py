@@ -1,7 +1,64 @@
+import logging as log
 from requests_html import HTMLSession
 
-from classes import *
-from functions import *
+from classes import Htmlstack
+
+# from functions import *
+# import functions as fn
+def star2num(str):
+    return (
+        str.replace("★★★★★", "5")
+        .replace("★★★★✰", "4")
+        .replace("★★★✰✰", "3")
+        .replace("★★✰✰✰", "2")
+        .replace("★✰✰✰✰", "1")
+        .replace("✰✰✰✰✰", "0")
+        .replace("★", "")
+        .replace("✰", "")
+    )
+
+
+def search(childlist, str):
+    try:
+        while childlist.peek():
+            if str in childlist.peek().text:
+                return True
+            else:
+                childlist.pop()
+        return False
+    except IndexError:
+        return False
+
+
+def equip_priority(e):
+    # Delete area data by ignoring first index
+    es = e.split("\n")[1:]
+    # if lines greater than 3 then delete the Weapon, Helmet and Shield (always ATK,HP and DEF)
+    if len(es) >= 4:
+        del es[1:4]
+    return "\n".join(es)
+
+
+def create_dictitems_from_list(dict, keylist, valuestr):
+    vl = valuestr.split("\n")
+
+    for k in keylist:
+        for s in vl:
+            if k.upper() in s:
+                dict[k] = s.split(":")[-1].strip()
+                break
+
+    return
+
+
+# def overview(dict, valuestr):
+#     keylist = ["faction", "rarity", "role", "affinity", "usability", "tomes"]
+#     return create_dictitems_from_list(dict, keylist, valuestr)
+
+
+# def totalstats(dict, valuestr):
+#     keylist = ["HP", "ATK", "DEF", "SPD", "C.RATE", "C.DMG", "RESIST", "ACC"]
+#     return create_dictitems_from_list(dict, keylist, valuestr)
 
 
 def get_champ(r, tier_linkDict):
@@ -14,8 +71,9 @@ def get_champ(r, tier_linkDict):
     champdict["Name"] = header[0].strip()
     # Short description is 2nd eg.'SO-RSS' Faction-Rarity/Role/Affinity
     champdict["Desc"] = header[1].strip()
-    # Get tier from first character of key 'tier' from current dictionary
+    # Get info  from passed dictionary
     champdict["Tier"] = tier_linkDict["tier"]
+    champdict["Link"] = tier_linkDict["url"]
     # Get first child list of elements
     htmlChildList = Htmlstack(
         r.html.find(
@@ -32,8 +90,12 @@ def get_champ(r, tier_linkDict):
         # Skip over possible elements to Overview (contains 'FACTON')
         search(paras, "FACTION")
         # overview and totalstats add keys to dictionary
-        overview(champdict, paras.pop().text)
-        totalstats(champdict, paras.pop().text)
+        keylist = ["faction", "rarity", "role", "affinity", "usability", "tomes"]
+        create_dictitems_from_list(champdict, keylist, paras.pop().text)
+        # overview(champdict, paras.pop().text)
+        keylist = ["HP", "ATK", "DEF", "SPD", "C.RATE", "C.DMG", "RESIST", "ACC"]
+        create_dictitems_from_list(champdict, keylist, paras.pop().text)
+        # totalstats(champdict, paras.pop().text)
         champdict["grinding"] = star2num(paras.pop().text)
         champdict["dungeons"] = star2num(paras.pop().text)
         champdict["potion"] = star2num(paras.pop().text)
@@ -45,17 +107,18 @@ def get_champ(r, tier_linkDict):
     if search(htmlChildList, champdict["Name"]):
         # Found heading: throw it away
         htmlChildList.pop()
-
-        skillList = []
+        attack = 1
+        # skillList = []
         # Check for end of list
-        while htmlChildList.peek():
-            # Collect all skills...
+        while htmlChildList.peek() is not None:
+            # Collect all skills
             if htmlChildList.peek().find("strong"):
-                skillList.append(htmlChildList.pop().text)
+                champdict[f"A{attack}"] = htmlChildList.pop().text
+                attack += 1
             else:
                 break
         # ... and join via newlines for single string
-        champdict["skills"] = "\n".join(skillList)
+        # champdict["skills"] = "\n".join(skillList)
 
     # 'Equipment' string is curently consistent
     if search(htmlChildList, "Equipment"):
@@ -68,21 +131,49 @@ def get_champ(r, tier_linkDict):
         table = htmlChildList.peek().find("tr p")
         #   If it exists then add to dictionary...
         if table:
+            # table could be processed by the finally section below but this works consistently
             htmlChildList.pop()
             for key, ele in zip(keys, table):
                 champdict[key] = ele.text
         #   ...if it doesn't then try the next 3 <strong> childs
-        elif htmlChildList.peek().find("p strong"):
+        else:
+            set_priority = []
             try:
-                for key in keys[:3]:
-                    champdict[key] = equip_priority(
-                        htmlChildList.pop().text, removefirst=1
-                    )
-                #
-                champdict[keys[3]] = champdict["statArena"]
-            # Concede
-            except:
-                pass
+                while htmlChildList.peek():
+                    if htmlChildList.peek().find("p strong"):
+                        set_priority.append(htmlChildList.pop())
+                    else:
+                        break
+
+            except IndexError:
+                log.exception("Handled unexpected end in Equipment scrape")
+            # Gather any data found
+            finally:
+                sp = len(set_priority)
+                if sp:
+                    champdict[keys[0]] = set_priority[0].text.split("\n")[1]
+                    if sp == 2:
+                        champdict[keys[2]] = equip_priority(set_priority[1].text)
+                    elif sp >= 3:
+                        champdict[keys[1]] = set_priority[1].text.split("\n")[1]
+                        champdict[keys[2]] = equip_priority(set_priority[2].text)
+                        if sp >= 4:
+                            champdict[keys[3]] = equip_priority(set_priority[3].text)
+
+            #     # Do first 3 keys
+            #     for key in keys[:3]:
+            #         # Get set info by lines: ignore first line (area data)
+            #         champdict[key] = htmlChildList.pop().text.split("\n")[1]
+            #         # if lines greater than 3 then delete the Weapon, Helmet and Shield - always ATK,HP and DEF
+            #         # if len(e_set) > 3:
+            #         #     del e_set[1:4]
+            #         # Join to one string for key
+            #         # champdict[key] = "\n".join(e_set)
+            #     # statBoss is same as statArena
+            #     champdict[keys[3]] = champdict["statArena"]
+            # # Concede
+            # except IndexError:
+            #     pass
 
     # 'Mastery' string is curently consistent
     if search(htmlChildList, "Mastery"):
