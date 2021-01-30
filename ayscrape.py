@@ -15,7 +15,7 @@ tierLinkList = getlinks()
 # open session
 with HTMLSession() as session:
 
-    d = 421  # select tier start section <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    d = 0  # select tier start section <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     maxtuple = (0, 0, 0)
     mintuple = (0, 0, 10000)
     max_columns = 0
@@ -23,10 +23,11 @@ with HTMLSession() as session:
     # Store champion data in champlist of dictionaries
     champlist = []
     # Loop through dictionary list of link
-    for tier_link in tierLinkList[d : d + 30]:  ### Temporary tier range
+    for tier_link in tierLinkList[d:]:  ### Temporary tier range
         with session.get(tier_link["url"]) as r:
             c = get_champ(r, tier_link)
 
+        log.info(f"{c.get('Name', 'Not Found')} ({d}) Done")
         index = len(champlist)
         champlist.append(c)
         if len(c) > maxtuple[2]:
@@ -34,22 +35,21 @@ with HTMLSession() as session:
         if len(c) < mintuple[2]:
             mintuple = index, d, len(c)
 
-        log.info(f"{c.get('Name', 'Not Found')} ({d}) Done")
         d += 1
 
-    log.info(
-        "First most keys: %s (%s) = %s",
-        champlist[maxtuple[0]]["Name"],
-        maxtuple[1],
-        maxtuple[2],
-    )
+    # log.info(
+    #     "First most keys: %s (%s) = %s",
+    #     champlist[maxtuple[0]]["Name"],
+    #     maxtuple[1],
+    #     maxtuple[2],
+    # )
 
-    log.info(
-        "First least keys: %s (%s) = %s",
-        champlist[mintuple[0]]["Name"],
-        mintuple[1],
-        mintuple[2],
-    )
+    # log.info(
+    #     "First least keys: %s (%s) = %s",
+    #     champlist[mintuple[0]]["Name"],
+    #     mintuple[1],
+    #     mintuple[2],
+    # )
 
     f = open("key1.txt", mode="w")
     print(champlist[maxtuple[0]]["Name"], file=f)
