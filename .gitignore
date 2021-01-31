@@ -1,3 +1,7 @@
 venv
 .vscode
 *.tmp
+__pycache__
+*.html
+*.txt
+*.log
