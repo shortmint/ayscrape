@@ -23,7 +23,7 @@ with HTMLSession() as session:
     # Store champion data in champlist of dictionaries
     champlist = []
     # Loop through dictionary list of link
-    for tier_link in tierLinkList[d:]:  ### Temporary tier range
+    for tier_link in tierLinkList[d:1]:  ### Temporary tier range
         with session.get(tier_link["url"]) as r:
             c = get_champ(r, tier_link)
 
