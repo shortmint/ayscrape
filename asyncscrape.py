@@ -47,52 +47,67 @@ def getfunc5(url):
     return get_resp5
 
 
-log.basicConfig(level=log.INFO, format="%(levelname)s:%(module)s:%(message)s)")
-# level=log.DEBUG, filename="root.log", format="%(asctime)%:%(levelname)%:%(message)%"
+# Temporary function - Delete Temporaries when stable and info gleaned
+def tmp_info(maxtuple, mintuple):
+    clen = len(champlist)
+    if len(cdir) > maxtuple[2]:
+        maxtuple = clen - 1, d, len(cdir)
+    if len(cdir) < mintuple[2]:
+        mintuple = clen - 1, d, len(cdir)
+    return maxtuple, mintuple
 
-# Initialise vars for min/max length dict items
+
+# level=log.DEBUG, filename="root.log", format="%(asctime)%:%(levelname)%:%(message)%"
+# Configure logger
+log.basicConfig(level=log.INFO, format="%(levelname)s:%(module)s:%(message)s)")
+
+
+# Temporary for min/max number of dictionary items sraped: Initialise vars
 maxtuple = (0, 0, 0)
 mintuple = (0, 0, 10000)
-max_columns = 0
+
 # Number of async functions
 chunk = 5
 
-# Use parent page to get the link by (tier, link) tuples
+# Use parent page to get a list of dictioaries with 'tier' and 'url' as keys
 tl = getlinks()
-d = 0
-tierLinkList = tl[d : d + 6]
 
-end = int(len(tierLinkList) / chunk) * chunk  #      |
+# Temporary: tl selects chunk from getlinks() for later processing
+d = 132
+# Change to tierLinkList = getlinks() when Temporary is taken out
+tierLinkList = tl[d:137]
 
-# Store champion data in champlist of dictionaries
+# Put end on a x*chunk boundary for async functions
+end = int(len(tierLinkList) / chunk) * chunk
+
+# Instanciate list for champion dictionaries
 champlist = []
-# Loop through dictionary list of link
+# Initialise dictionary list index
 index = 0
-# open session
+# open async session
 asession = AsyncHTMLSession()
 while index < end:
-
+    # Initialise secondary function parameters (Number of functions = chunk)
     get_resp1 = getfunc1(tierLinkList[index + 0]["url"])
     get_resp2 = getfunc2(tierLinkList[index + 1]["url"])
     get_resp3 = getfunc3(tierLinkList[index + 2]["url"])
     get_resp4 = getfunc4(tierLinkList[index + 3]["url"])
-    get_resp5 = getfunc5(tierLinkList[index + 5]["url"])
+    get_resp5 = getfunc5(tierLinkList[index + 4]["url"])
 
+    # Start async secondary functions
     resps = asession.run(get_resp1, get_resp2, get_resp3, get_resp4, get_resp5)
-    # with session.get(tier_link["url"]) as r:
-    #     cdir = get_champ(r, tier_link)
-    for i, r in enumerate(resps):
 
+    # Process responses
+    for i, r in enumerate(resps):
         cdir = get_champ(r, tierLinkList[index + i])
         champlist.append(cdir)
         log.info(f"{cdir.get('Name', 'Not Found')} ({d}) Done")
 
-        clen = len(champlist)
-        if len(cdir) > maxtuple[2]:
-            maxtuple = clen - 1, d, len(cdir)
-        if len(cdir) < mintuple[2]:
-            mintuple = clen - 1, d, len(cdir)
+        # Temporary supplement information to create csv from largest dict items
+        #   and smallest dict items to investigate any parsing errors
+        maxtuple, mintuple = tmp_info(maxtuple, mintuple)
         d += 1
+        # End of Temporary info
 
     index += chunk
 rem = len(tierLinkList) % chunk
@@ -104,16 +119,23 @@ while rem:
     champlist.append(cdir)
     log.info(f"{cdir.get('Name', 'Not Found')} ({d}) Done")
 
-    clen = len(champlist)
-    if len(cdir) > maxtuple[2]:
-        maxtuple = clen - 1, d, len(cdir)
-    if len(cdir) < mintuple[2]:
-        mintuple = clen - 1, d, len(cdir)
+    # Temporary supplement information to create csv from largest dict items
+    #   and smallest dict items to investigate any parsing errors
+    maxtuple, mintuple = tmp_info(maxtuple, mintuple)
+
+    # clen = len(champlist)
+    # if len(cdir) > maxtuple[2]:
+    #     maxtuple = clen - 1, d, len(cdir)
+    # if len(cdir) < mintuple[2]:
+    #     mintuple = clen - 1, d, len(cdir)
     d += 1
+    # End of Temporary info
+
     rem -= 1
     index += 1
+session.close()
 
-# asession.close() <------ DO NOT USE
+# Temporary min/max info
 log.info(
     "First most keys: %s (%s) = %s",
     champlist[maxtuple[0]]["Name"],
@@ -141,3 +163,4 @@ print(champlist[mintuple[0]]["Name"], file=f)
 for key in champlist[mintuple[0]].keys():
     print(key, file=f)
 f.close()
+# End of Temporary min/max info
