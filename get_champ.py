@@ -1,9 +1,3 @@
-import logging as log
-from requests_html import HTMLSession
-
-
-# from functions import *
-# import functions as fn
 def star2num(str):
     return (
         str.replace("★★★★★", "5")
@@ -37,12 +31,12 @@ def search(childlist, str):
 
 
 def equip_priority(e):
-    # Delete area data by ignoring first index
-    es = e.split("\n")[1:]
+    es = e.split("\n")
+    py = ""
     # if lines greater than 3 then delete the Weapon, Helmet and Shield (always ATK,HP and DEF)
     if len(es) >= 4:
-        del es[1:4]
-    return "\n".join(es)
+        py = "\n".join(es[4:])
+    return es[0], py
 
 
 def create_dictitems_from_list(dict, keylist, valuestr):
@@ -57,7 +51,7 @@ def create_dictitems_from_list(dict, keylist, valuestr):
     return
 
 
-def get_champ(r, tier_linkDict):
+def get_champ(r, tier_link):
     # Get header data
     #  Split string to list using '|' as seperater
     header = r.html.find("#content header", first=True).text.split("|")
@@ -67,9 +61,9 @@ def get_champ(r, tier_linkDict):
     champdict["Name"] = header[0].strip()
     # Short description is 2nd eg.'SO-RSS' Faction-Rarity/Role/Affinity
     champdict["Desc"] = header[1].strip()
-    # Get info  from passed dictionary
-    champdict["Tier"] = tier_linkDict["tier"]
-    champdict["Link"] = tier_linkDict["url"]
+    # Get info  from passed tuple
+    champdict["Link"], champdict["Tier"] = tier_link
+
     # Get first child list of elements
     # h3 table selectors to overcome typo in html
     htmlChildList = r.html.find(
@@ -79,24 +73,36 @@ def get_champ(r, tier_linkDict):
     # First seection is quite stable but skip collection if AttriuteError occurs
     #  or avatar is not there
     if test(htmlChildList):
-        champdict["avatar"] = htmlChildList.pop().find("img", first=True).attrs["src"]
-        paras = htmlChildList.pop().find("td p")
-        paras.reverse()
-        # keys from table
-        champdict["obtain"] = paras.pop().text
-        # Skip over possible elements to Overview (contains 'FACTON')
-        search(paras, "FACTION")
-        # overview and totalstats add keys to dictionary
-        keylist = ["faction", "rarity", "role", "affinity", "usability", "tomes"]
-        create_dictitems_from_list(champdict, keylist, paras.pop().text)
-        # overview(champdict, paras.pop().text)
-        keylist = ["HP", "ATK", "DEF", "SPD", "C.RATE", "C.DMG", "RESIST", "ACC"]
-        create_dictitems_from_list(champdict, keylist, paras.pop().text)
-        # totalstats(champdict, paras.pop().text)
-        champdict["grinding"] = star2num(paras.pop().text)
-        champdict["dungeons"] = star2num(paras.pop().text)
-        champdict["potion"] = star2num(paras.pop().text)
-        champdict["doomtower"] = star2num(paras.pop().text)
+        try:
+            champdict["avatar"] = htmlChildList[-1].find("img", first=True).attrs["src"]
+            htmlChildList.pop()
+        except AttributeError:
+            while not htmlChildList[-1].find("td p", first=True):
+                try:
+                    htmlChildList.pop()
+                except IndexError:
+                    pass
+
+        try:
+            paras = htmlChildList.pop().find("td p")
+            paras.reverse()
+            # keys from table
+            champdict["obtain"] = paras.pop().text
+            # Skip over possible elements to Overview (contains 'FACTON')
+            search(paras, "FACTION")
+            # overview and totalstats add keys to dictionary
+            keylist = ["faction", "rarity", "role", "affinity", "usability", "tomes"]
+            create_dictitems_from_list(champdict, keylist, paras.pop().text)
+            # overview(champdict, paras.pop().text)
+            keylist = ["HP", "ATK", "DEF", "SPD", "C.RATE", "C.DMG", "RESIST", "ACC"]
+            create_dictitems_from_list(champdict, keylist, paras.pop().text)
+            # totalstats(champdict, paras.pop().text)
+            champdict["grinding"] = star2num(paras.pop().text)
+            champdict["dungeons"] = star2num(paras.pop().text)
+            champdict["potion"] = star2num(paras.pop().text)
+            champdict["doomtower"] = star2num(paras.pop().text)
+        except IndexError:
+            pass
 
     # Get Equipment:
     #   Sometimes 'Equipment' is not in a heading, so use name
@@ -121,43 +127,44 @@ def get_champ(r, tier_linkDict):
         # Found heading: throw it away
         htmlChildList.pop()
         # Next section is a <table> or a series of flat first child <p>'s
-        #   define key names for champion dictioary
-        keys = ["setArena", "setBoss", "statArena", "statBoss"]
         #   Try to collect data by <p> if it exists
         if test(htmlChildList):
-            table = htmlChildList[-1].find("tr p")
-            #   If it exists then add to dictionary...
-            if table:
-                # table could be processed by the finally section below but this works consistently
-                htmlChildList.pop()
-                for key, ele in zip(keys, table):
-                    champdict[key] = ele.text
-            #   ...if it doesn't then try the next 3 <strong> childs
+            setp = []
+            if htmlChildList[-1].find("table td p"):
+                setp = htmlChildList.pop().find("table td p")
             else:
-                set_priority = []
-                try:
-                    while test(htmlChildList):
-                        if htmlChildList[-1].find("p strong"):
-                            set_priority.append(htmlChildList.pop())
-                        else:
-                            break
+                while test(htmlChildList):
+                    if htmlChildList[-1].find("p"):
+                        setp.append(htmlChildList.pop())
+                    else:
+                        break
 
-                except IndexError:
-                    log.exception("Handled unexpected end in Equipment scrape")
-                # Gather any data found
-                finally:
-                    sp = len(set_priority)
-                    if sp:
-                        champdict[keys[0]] = set_priority[0].text.split("\n")[1]
-                        if sp == 2:
-                            champdict[keys[2]] = equip_priority(set_priority[1].text)
-                        elif sp >= 3:
-                            champdict[keys[1]] = set_priority[1].text.split("\n")[1]
-                            champdict[keys[2]] = equip_priority(set_priority[2].text)
-                            if sp >= 4:
-                                champdict[keys[3]] = equip_priority(
-                                    set_priority[3].text
-                                )
+            # Get rid of <strong>'s and collect non-<strong>'s
+            set_priority = []
+            for s in setp:
+                if not "strong>" in s.html:
+                    set_priority.append(s.text)
+                elif "strong>" in s.html and "\n" in s.text:
+                    set_priority.append(s.text.split("\n", 1)[1])
+
+            sp = len(set_priority)
+            # Should be 0 to 4 items in set_prority list
+            if sp:
+                champdict["setArena"] = set_priority[0]
+                if sp == 2:
+                    champdict["priorityArena"], champdict["statArena"] = equip_priority(
+                        set_priority[1]
+                    )
+                elif sp >= 3:
+                    champdict["setBoss"] = set_priority[1]
+                    champdict["priorityArena"], champdict["statArena"] = equip_priority(
+                        set_priority[2]
+                    )
+                    if sp >= 4:
+                        (
+                            champdict["priorityBoss"],
+                            champdict["statBoss"],
+                        ) = equip_priority(set_priority[3])
 
     # 'Mastery' string is curently consistent
     if search(htmlChildList, "Mastery"):
@@ -208,9 +215,6 @@ def get_champ(r, tier_linkDict):
                     )
                     # Prepare for next set of keys
                     mast_index += 1
-
-            #  No expected elements
-            #   We're done
             else:
                 break
 

@@ -5,3 +5,6 @@ __pycache__
 *.html
 *.txt
 *.log
+*.bak
+*.csv
+*.xlsx
